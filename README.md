@@ -1,6 +1,6 @@
 # dual-wield-mcp
 
-MCP (Model Context Protocol) server exposing Linux desktop control to AI agents over Wayland. Built for dual-client compatibility with Claude Code and Hermes Agent.
+MCP (Model Context Protocol) server exposing Linux desktop control to AI agents over Wayland, for Fedora Linux with KDE Plasma only. Built for dual-client compatibility with Claude Code and Hermes Agent.
 
 ## Status
 
@@ -177,30 +177,3 @@ Environment variables (all optional):
 - `find_text(path, query, case_sensitive=False, window=None)` — locate text in a screenshot via local OCR (tesseract), returning each matching line's text, bounding box, and center point in the same physical-pixel space `mouse_move`/`mouse_click` use. Use this to click a specific labeled button, link, or menu item without a manual screenshot -> `inspect_region` -> eyeball-the-pixel loop. Not infallible — treat a single high-confidence match as safe to click directly, and fall back to a visual check on multiple matches or low confidence. Pass `window` (a window id from `get_windows`, or a title substring) to scope OCR to just that window's region — the screenshot is cropped to the window's bounds before OCR runs, and returned coordinates are translated back to absolute screen space. Use this whenever the query text could plausibly appear elsewhere on the desktop too (most commonly the calling agent's own visible terminal), since without scoping, OCR can merge real text from the target window with unrelated text from a different window into one line, silently shifting the match off target rather than cleanly refusing. KDE backend only.
 - `click_text(query, path=None, case_sensitive=False, button="left", min_confidence=60.0, expected_window_class=None, window=None)` — finds `query` via OCR and clicks it in one server-side call: captures a fresh screenshot if `path` is omitted, and only acts when there is exactly one match at or above `min_confidence`. No image is ever sent back for review on this path. Refuses (`ToolError`) on zero, multiple, or low-confidence matches instead of guessing — fall back to `find_text` plus a visual check in that case. `window` has the same scoping semantics as `find_text`'s parameter.
 - `read_screen_text(path=None, window=None)` — like `find_text` but with no query filter: returns every detected line of text and its position, sorted top-to-bottom then left-to-right. Captures a fresh screenshot if `path` is omitted. Use this to read a whole board, grid, or list in one call (e.g. every revealed number in a puzzle game, or every row of a file list) instead of several `find_text` calls or eyeballing `inspect_region` crops one at a time. `window` scopes the read to one window's region, same semantics as `find_text` — but note this is not automatically a strict improvement: cropping can occasionally cause tesseract to miss stylized/hyperlink text it would find with full-page context, so prefer scoping when disambiguating a click target and prefer a full, unscoped read when bulk-reading content matters more than excluding unrelated text.
-
-## Development
-
-```bash
-uv pip install --python .venv/bin/python -e . --group dev
-.venv/bin/pytest tests/
-.venv/bin/ruff check . --fix && .venv/bin/ruff format .
-```
-
-`find_text`'s OCR grouping accuracy has its own standardized benchmark, separate
-from the pytest suite (needs the real `tesseract` binary, slower than a mocked
-unit test) — see [benchmarks/find_text/README.md](benchmarks/find_text/README.md).
-Run it when changing `tools/ocr.py`:
-
-```bash
-.venv/bin/python benchmarks/find_text/run_benchmark.py
-```
-
-The tool suite as a whole (not just OCR accuracy) has a second benchmark that
-drives real applications on the real desktop through the actual MCP tools --
-see [benchmarks/desktop_navigation/README.md](benchmarks/desktop_navigation/README.md).
-It takes over the mouse and keyboard, so don't run it while doing anything
-else on the machine:
-
-```bash
-.venv/bin/python benchmarks/desktop_navigation/run_benchmark.py
-```
