@@ -1,0 +1,167 @@
+[
+  {
+    "id": "icon_grid_kickoff_clamtk",
+    "image": "icon_grid_kickoff.png",
+    "query": "ClamTk",
+    "case_sensitive": false,
+    "category": "icon_grid",
+    "known_limitation": false,
+    "expected_bboxes": [
+      [
+        720,
+        156,
+        799,
+        172
+      ]
+    ],
+    "notes": "Rightmost of 4 icon labels on one row; must not merge with its neighbors."
+  },
+  {
+    "id": "icon_grid_kickoff_steam",
+    "image": "icon_grid_kickoff.png",
+    "query": "Steam",
+    "case_sensitive": false,
+    "category": "icon_grid",
+    "known_limitation": false,
+    "expected_bboxes": [
+      [
+        260,
+        157,
+        325,
+        172
+      ]
+    ],
+    "notes": "A middle-column label, flanked on both sides -- the harder case for gap-splitting."
+  },
+  {
+    "id": "icon_grid_clamtk_settings",
+    "image": "icon_grid_clamtk_config.png",
+    "query": "Settings",
+    "case_sensitive": false,
+    "category": "icon_grid",
+    "known_limitation": false,
+    "expected_bboxes": [
+      [
+        40,
+        156,
+        124,
+        176
+      ]
+    ],
+    "notes": "Leftmost label of the exact row that failed during the live ClamTk test."
+  },
+  {
+    "id": "icon_grid_clamtk_scheduler",
+    "image": "icon_grid_clamtk_config.png",
+    "query": "Scheduler",
+    "case_sensitive": false,
+    "category": "icon_grid",
+    "known_limitation": false,
+    "expected_bboxes": [
+      [
+        700,
+        156,
+        804,
+        172
+      ]
+    ],
+    "notes": "Rightmost label of the same row."
+  },
+  {
+    "id": "multiword_phrase_engine_driver",
+    "image": "multiword_phrase.png",
+    "query": "Engine Driver",
+    "case_sensitive": false,
+    "category": "prose",
+    "known_limitation": false,
+    "expected_bboxes": [
+      [
+        40,
+        66,
+        177,
+        86
+      ]
+    ],
+    "notes": "Two words of one phrase, normal inter-word gap -- must stay merged into one match."
+  },
+  {
+    "id": "dense_list_single_match",
+    "image": "dense_list.png",
+    "query": "invoice",
+    "case_sensitive": false,
+    "category": "list",
+    "known_limitation": false,
+    "expected_bboxes": [
+      [
+        40,
+        35,
+        217,
+        56
+      ]
+    ],
+    "notes": "Substring unique to one row among several similar-looking rows."
+  },
+  {
+    "id": "dense_list_multi_match",
+    "image": "dense_list.png",
+    "query": "report",
+    "case_sensitive": false,
+    "category": "list",
+    "known_limitation": false,
+    "expected_bboxes": [
+      [
+        40,
+        85,
+        221,
+        106
+      ],
+      [
+        40,
+        135,
+        201,
+        156
+      ],
+      [
+        40,
+        285,
+        252,
+        306
+      ]
+    ],
+    "notes": "Substring shared by 3 non-adjacent-in-value rows -- each must resolve to its own row, none merged."
+  },
+  {
+    "id": "close_together_yes_no",
+    "image": "close_together_labels.png",
+    "query": "Yes",
+    "case_sensitive": false,
+    "category": "edge_case",
+    "known_limitation": true,
+    "expected_bboxes": [
+      [
+        40,
+        67,
+        75,
+        82
+      ]
+    ],
+    "notes": "Two distinct short labels closer together than the gap threshold; currently merges with the adjacent 'No' label at [90, 67, 120, 82]."
+  },
+  {
+    "id": "small_stylized_text_details",
+    "image": "small_stylized_text.png",
+    "query": "Details",
+    "case_sensitive": false,
+    "category": "small_text",
+    "known_limitation": false,
+    "expected_bboxes": [
+      [
+        30,
+        53,
+        68,
+        62
+      ]
+    ],
+    "notes": "12px text -- checks OCR still resolves a small label correctly."
+  }
+]
