@@ -3,6 +3,7 @@ import logging
 import re
 import shutil
 import subprocess
+import time
 from dataclasses import asdict, dataclass
 
 from mcp.server.fastmcp import FastMCP
@@ -13,6 +14,15 @@ from dual_wield_mcp.config import ServerConfig
 logger = logging.getLogger(__name__)
 
 _SUBPROCESS_TIMEOUT = 10
+
+# Brief pause after issuing a move/resize before returning, so a screenshot
+# taken immediately after doesn't catch the window mid-animation -- observed
+# live via a Hermes Agent test where the very next screenshot after a
+# resize_window call showed a transitional frame. KWin's actual animation
+# duration for a scripted (non-drag) geometry change wasn't isolated and
+# measured directly; this value is the midpoint of the range suggested from
+# that live observation, not a verified exact figure.
+_WINDOW_SETTLE_DELAY_SECONDS = 0.25
 
 _POSITION_RE = re.compile(r"Position:\s*(-?[\d.]+),\s*(-?[\d.]+)")
 _GEOMETRY_RE = re.compile(r"Geometry:\s*([\d.]+)x([\d.]+)")
@@ -258,12 +268,14 @@ def _kde_close_window(config: ServerConfig, target: str) -> str:
 def _kde_move_window(config: ServerConfig, target: str, x: int, y: int) -> str:
     window_ref = _kde_resolve_window_ref(config, target)
     _run([config.kdotool_path, "windowmove", window_ref, str(x), str(y)])
+    time.sleep(_WINDOW_SETTLE_DELAY_SECONDS)
     return window_ref
 
 
 def _kde_resize_window(config: ServerConfig, target: str, width: int, height: int) -> str:
     window_ref = _kde_resolve_window_ref(config, target)
     _run([config.kdotool_path, "windowsize", window_ref, str(width), str(height)])
+    time.sleep(_WINDOW_SETTLE_DELAY_SECONDS)
     return window_ref
 
 
@@ -422,7 +434,9 @@ def register_window_tools(mcp: FastMCP, config: ServerConfig) -> None:
         --window-position): Wayland does not let a client set its own absolute
         position, so such flags are silently ignored, but this goes through
         KWin's own scripting interface, which can place a window
-        authoritatively.
+        authoritatively. Waits briefly before returning so a screenshot taken
+        immediately after doesn't catch the window still animating into
+        place.
         """
         if not window:
             raise ToolError("window must not be empty")
@@ -448,7 +462,9 @@ def register_window_tools(mcp: FastMCP, config: ServerConfig) -> None:
                 screenshot/mouse_move/mouse_click use.
             height: target height, in logical pixels.
 
-        KDE backend only — wlrctl has no resize action.
+        KDE backend only — wlrctl has no resize action. Waits briefly before
+        returning so a screenshot taken immediately after doesn't catch the
+        window still animating into place.
         """
         if width <= 0 or height <= 0:
             raise ToolError("width and height must be positive")

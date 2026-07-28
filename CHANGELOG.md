@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.12.0] - 2026-07-28
+
+Phase 17 (Live-Feedback Follow-ups) complete -- the fourth and final item
+from the Hermes Agent feedback review.
+
+### Fixed
+
+- `move_window`/`resize_window` sometimes left the window still animating
+  into place when the very next tool call was a `screenshot`, catching a
+  transitional frame. Both now wait `_WINDOW_SETTLE_DELAY_SECONDS` (0.25s)
+  after issuing the move/resize before returning. Chosen as the midpoint of
+  the 200-300ms range suggested from the live observation; KWin's actual
+  animation duration for a scripted (non-drag) geometry change wasn't
+  isolated and measured directly, so this is a reasonable estimate rather
+  than a verified exact figure.
+
 ## [1.11.0] - 2026-07-28
 
 Phase 17 (Live-Feedback Follow-ups) advanced with a third item -- the
