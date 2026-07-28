@@ -103,6 +103,23 @@ round trip between them is slower than the desktop's double-click timing
 threshold. Prefer a single click plus focus_window plus key_press("enter")
 over double=True when the target has a keyboard-activation equivalent --
 double=True is for when it doesn't.
+
+mouse_click also accepts optional x/y/space to move the pointer there first
+and click in one call, same as click_text already does internally for
+OCR-found targets -- prefer this over a separate mouse_move then mouse_click
+for a manually-computed coordinate (e.g. read off an inspect_region crop):
+it removes the MCP round trip between the move finishing and the click
+firing, which is real time the user's own live mouse movement could land
+in.
+
+If tool calls are hitting individual first-use permission prompts scattered
+through a session rather than resolved upfront, that's a client-side config
+gap, not something to work around mid-task: recommend the user pre-approve
+every dual-wield-mcp tool at once in their client's permission config (e.g.
+Claude Code's .claude/settings.json permissions.allow, one
+mcp__dual-wield__<tool> entry per tool) instead of clearing prompts one at a
+time as they come up. Confirmed live to eliminate the scattered-prompt
+problem entirely, with no server-side change needed.
 """
 
 

@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.8.0] - 2026-07-27
+
+Phase 15 (Move-and-Click Round-Trip Reduction) complete -- closes the one
+remaining gap `click_text` didn't already cover: clicking at an explicit
+coordinate (e.g. read off an `inspect_region` crop) still needed a separate
+`mouse_move` then `mouse_click` call, leaving a full MCP round trip open for
+the user's own live mouse movement to land in between, on a machine where
+the user routinely multitasks during a session.
+
+### Added
+
+- `mouse_click` gained optional `x`, `y`, and `space` parameters, mirroring
+  `mouse_move`'s own coordinate contract. When `x`/`y` are given (both
+  required together), the pointer moves there first via the same
+  `_move_mouse_absolute` closed-loop correction `mouse_move` uses, then
+  clicks -- all within the one call, removing the MCP round trip between a
+  separate move and click. Omitting both keeps existing behavior: click
+  wherever the pointer already is. `expected_window_class`, when given, is
+  still checked once immediately before the click byte is sent (i.e. after
+  any move). Covered by 7 new tests in `tests/test_input.py`.
+
+### Known limitations
+
+- Does not eliminate the exposure window entirely: `mouse_move`'s
+  closed-loop correction can still take a few real iterations (subprocess
+  spawn + readback) to converge before the click fires. Zero exposure is
+  Phase 14's (deferred) territory -- detecting genuine human input at the
+  device level and disengaging -- not this change's.
+
 ## [1.7.0] - 2026-07-27
 
 Follows directly from `benchmarks/desktop_navigation/`, built the same day to

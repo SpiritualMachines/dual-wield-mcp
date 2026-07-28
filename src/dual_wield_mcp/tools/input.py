@@ -230,19 +230,39 @@ def register_input_tools(mcp: FastMCP, config: ServerConfig) -> None:
 
     @mcp.tool()
     def mouse_click(
-        button: str = "left", expected_window_class: str | None = None, double: bool = False
+        button: str = "left",
+        x: int | None = None,
+        y: int | None = None,
+        space: str = "physical",
+        expected_window_class: str | None = None,
+        double: bool = False,
     ) -> str:
-        """Click a mouse button.
+        """Click a mouse button, optionally moving the pointer there first.
 
         Args:
             button: one of left, right, middle, side, extra, forward, back, task
+            x: optional target X coordinate. If given (together with y), the
+                pointer is moved there first via the same closed-loop
+                correction mouse_move uses, then clicked -- all within this
+                one call. A separate mouse_move followed by mouse_click
+                leaves a full MCP round trip between the move finishing and
+                the click firing, which is real time for the user's own live
+                mouse movement to land in; combining them here removes that
+                gap for the manual-coordinate case (click_text already does
+                this internally for OCR-found targets). Omit both x and y to
+                click wherever the pointer already is.
+            y: optional target Y coordinate. Must be given together with x.
+            space: "physical" (default) or "logical" -- which pixel space x/y
+                are given in, same meaning as mouse_move's space parameter.
+                Ignored if x/y are omitted.
             expected_window_class: optional. If given, verify the currently
                 focused window's class matches before clicking, raising
                 ToolError on a mismatch instead of clicking into a possibly
                 stale target. Get a window's class from get_windows or
-                get_active_window. KDE backend only. Checked once before the
-                click; clicking can itself legitimately change focus (e.g. a
-                click opening a new dialog), so this is not re-checked after.
+                get_active_window. KDE backend only. Checked once,
+                immediately before the click (after any move); clicking can
+                itself legitimately change focus (e.g. a click opening a new
+                dialog), so this is not re-checked after.
             double: if True, click twice in quick succession within this one
                 call to register as a double-click -- e.g. to open a file or
                 folder in a list/icon view configured for double-click-to-open.
@@ -257,6 +277,23 @@ def register_input_tools(mcp: FastMCP, config: ServerConfig) -> None:
         button_code = _BUTTON_CODES.get(button.strip().lower())
         if button_code is None:
             raise ToolError(f"unknown button: {button!r}")
+        if space not in ("physical", "logical"):
+            raise ToolError('space must be "physical" or "logical"')
+        if (x is None) != (y is None):
+            raise ToolError("x and y must be given together")
+
+        if x is not None:
+            if x < 0 or y < 0:
+                raise ToolError("x and y must be non-negative")
+
+            target_x, target_y = float(x), float(y)
+            if space == "logical":
+                scale = _get_display_scale(config)
+                target_x *= scale
+                target_y *= scale
+
+            logger.info("moving mouse to (%d, %d) [%s] before clicking", x, y, space)
+            _move_mouse_absolute(config, target_x, target_y)
 
         _check_expected_window(config, expected_window_class)
 

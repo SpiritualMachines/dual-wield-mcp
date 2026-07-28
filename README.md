@@ -4,7 +4,7 @@ MCP (Model Context Protocol) server exposing Linux desktop control to AI agents 
 
 ## Status
 
-v1.7.0 — Phases 1-12 complete. Phase 13 (session initialization and permission warm-up) and Phase 14 (Concurrent Input Detection) are both exploratory, no version target. See [ROADMAP.md](ROADMAP.md).
+v1.8.0 — Phases 1-12 and 15 complete. Phase 13 (session initialization and permission warm-up) and Phase 14 (Concurrent Input Detection) are both exploratory, no version target. See [ROADMAP.md](ROADMAP.md).
 
 **Tip:** call `focus_window` before `type_text`/`key_press` to target a specific window —
 synthetic mouse clicks alone do not reliably transfer keyboard focus on KWin (see
@@ -127,6 +127,17 @@ respond, which can itself change focus on the desktop being automated. Routing
 everything through this server's typed, schema-validated tools avoids that class of
 prompt entirely once the tools are allowlisted by name.
 
+For clients that support pre-approving tools by name (Claude Code's
+`.claude/settings.json`/`settings.local.json`, via `permissions.allow`), pre-populate
+it with every tool listed under Tools below, rather than letting each one hit its own
+first-use approval prompt scattered across a session. Confirmed live: doing this
+eliminates a fresh session's scattered-prompt problem entirely, with no server changes
+needed. List each tool explicitly as `mcp__dual-wield__<tool_name>` (e.g.
+`mcp__dual-wield__mouse_click`) — a `mcp__dual-wield__*` wildcard entry is also
+accepted, but community reports (anthropics/claude-code issues #3107, #6010) say the
+wildcard form alone isn't always honored, so keep the explicit per-tool list alongside
+it rather than relying on the wildcard by itself.
+
 ### A note on the desktop session environment
 
 MCP clients (including the reference Python SDK used by Claude Code) only pass a small,
@@ -163,7 +174,7 @@ Environment variables (all optional):
 - `screenshot(mode="full"|"region", output_path=None, include_image=True)` — captures the desktop via `spectacle` in background mode, optionally selecting a region first via an on-screen drag selection. Returns the saved file's absolute path as text, followed by the captured image. Pass `include_image=False` to return only the path when the screenshot is just input to `find_text`/`click_text` and won't be viewed directly — skips sending the image for vision processing.
 - `inspect_region(path, x, y, width, height, output_path=None)` — crops a rectangular region out of an existing screenshot for close-up pixel inspection, without shelling out to `magick`/`identify`. Returns the cropped file's absolute path as text, followed by the cropped image.
 - `mouse_move(x, y, space="physical")` — move the pointer to an absolute screen position. `space="logical"` accepts `get_windows`/`move_window`-style coordinates directly, converting via the display scale instead of requiring the caller to do it by hand.
-- `mouse_click(button="left", expected_window_class=None, double=False)` — click a mouse button (`left`, `right`, `middle`, `side`, `extra`, `forward`, `back`, `task`). If `expected_window_class` is given, verifies the focused window's class first and raises `ToolError` on a mismatch instead of clicking a possibly stale target (KDE backend only). Pass `double=True` to double-click (two clicks within this one call, separated by a short server-side delay) — two separate `mouse_click` calls do not reliably register as a double-click, since the round trip between them is slower than the desktop's double-click timing threshold.
+- `mouse_click(button="left", x=None, y=None, space="physical", expected_window_class=None, double=False)` — click a mouse button (`left`, `right`, `middle`, `side`, `extra`, `forward`, `back`, `task`). Pass `x`/`y` (and optionally `space`, same meaning as `mouse_move`'s) to move the pointer there first and click in one call — required together, and removes the MCP round trip a separate `mouse_move` + `mouse_click` pair leaves open for the user's own live mouse movement to land in; omit both to click wherever the pointer already is. If `expected_window_class` is given, verifies the focused window's class (after any move, immediately before clicking) and raises `ToolError` on a mismatch instead of clicking a possibly stale target (KDE backend only). Pass `double=True` to double-click (two clicks within this one call, separated by a short server-side delay) — two separate `mouse_click` calls do not reliably register as a double-click, since the round trip between them is slower than the desktop's double-click timing threshold.
 - `key_press(keys)` — press a key or `+`-joined combination (e.g. `"ctrl+shift+t"`).
 - `type_text(text, expected_window_class=None)` — type a literal string. If `expected_window_class` is given, verifies the focused window's class both before and after typing, raising `ToolError` on a mismatch — the post-check catches focus drift (e.g. the user alt-tabbing) mid-action (KDE backend only).
 - `get_windows()` — list visible windows with id, title, class, pid, and position/size. KDE backend only (`wlrctl` has no window-listing command). Note: position/size are in KWin's logical (HiDPI-scaled) pixels, which can differ from the physical pixels used by `screenshot`/mouse tools.
