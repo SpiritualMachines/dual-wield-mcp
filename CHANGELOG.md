@@ -1,5 +1,36 @@
 # Changelog
 
+## [1.10.0] - 2026-07-28
+
+Phase 17 (Live-Feedback Follow-ups) partially complete -- the two
+highest-value items from a live "ask the agent for feedback" review with
+Hermes Agent, addressed first per the user's own prioritization. The
+remaining two items (window-scope crop padding, a move/resize settle delay)
+stay proposed.
+
+### Added
+
+- New `paste_text(text)` tool: `clipboard_set` followed by
+  `key_press("ctrl+v")` in one server-side call. The two-call version was
+  already the documented recommended pattern for long or special-character
+  strings over `type_text`'s simulated typing; this collapses it into a
+  single round trip, the same rationale as `mouse_click`'s `x`/`y`/`space`
+  parameters and `click_text`. Covered by 3 new tests in
+  `tests/test_paste_text.py`.
+
+### Changed
+
+- `click_text`'s default `min_confidence` lowered from 60.0 to 40.0. A live
+  test found a real, unambiguous, correct match ("Select a directory")
+  scored only 48% confidence and was wrongly refused. On closer reading,
+  `min_confidence` only ever gates the single-remaining-candidate case --
+  multiple substring matches are always refused as ambiguous regardless of
+  confidence -- and `benchmarks/find_text/README.md` already documents a
+  genuine misread scoring 87%, confirming OCR confidence isn't a reliable
+  correctness signal in either direction. 40.0 sits below the real 48%
+  false-refusal and above the 30.0 already used as a "should refuse"
+  fixture in `tests/test_click_text.py`. Covered by a new regression test.
+
 ## [1.9.0] - 2026-07-28
 
 Phase 16 (Long-Text Input Timeout & Partial-Type Corruption) complete --

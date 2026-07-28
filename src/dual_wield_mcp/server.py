@@ -9,6 +9,7 @@ from dual_wield_mcp.tools.click_text import register_click_text_tools
 from dual_wield_mcp.tools.clipboard import register_clipboard_tools
 from dual_wield_mcp.tools.input import register_input_tools
 from dual_wield_mcp.tools.ocr import register_ocr_tools
+from dual_wield_mcp.tools.paste_text import register_paste_text_tools
 from dual_wield_mcp.tools.screenshot import register_screenshot_tool
 from dual_wield_mcp.tools.window import register_window_tools
 
@@ -57,8 +58,10 @@ After launch_app, prefer wait_for_window over a manual get_windows polling
 loop or a fixed sleep — it returns as soon as a matching window appears.
 
 For pasting long or special-character strings (URLs, search queries), prefer
-clipboard_set followed by key_press("ctrl+v") over type_text: it is a single
-atomic operation instead of simulated per-character typing.
+paste_text over type_text: it sets the clipboard and pastes via ctrl+v in one
+server-side call, atomic instead of simulated per-character typing. Use
+clipboard_set plus a separate key_press("ctrl+v") only when the clipboard
+needs to be set without pasting immediately.
 
 To click a specific labeled button, link, or menu item, prefer click_text over
 a manual screenshot -> find_text -> mouse_move -> mouse_click sequence: it does
@@ -130,6 +133,7 @@ def build_server(config: ServerConfig) -> FastMCP:
     register_window_tools(mcp, config)
     register_app_tools(mcp, config)
     register_clipboard_tools(mcp, config)
+    register_paste_text_tools(mcp, config)
     register_ocr_tools(mcp, config)
     register_click_text_tools(mcp, config)
     return mcp

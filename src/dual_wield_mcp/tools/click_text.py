@@ -16,7 +16,18 @@ from dual_wield_mcp.tools.screenshot import _capture_screenshot
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_MIN_CONFIDENCE = 60.0
+# Only ever gates the single-remaining-candidate case in practice: multiple
+# substring matches are always refused as ambiguous above, regardless of
+# confidence, so this threshold never actually chooses among several
+# candidates -- it is purely "how sure does OCR need to be about the one
+# read that's left" before acting automatically. A live test found a real,
+# correct, unambiguous match ("Select a directory") scored only 48
+# confidence and was wrongly refused at the old default of 60. Note
+# confidence is not a reliable proxy for correctness in either direction --
+# benchmarks/find_text/README.md documents a genuine misread ("Details" ->
+# "Detalls") scoring 87 -- so this default is a pragmatic adjustment based
+# on the one real false-refusal observed, not a validated accuracy cutoff.
+_DEFAULT_MIN_CONFIDENCE = 40.0
 
 
 def register_click_text_tools(mcp: FastMCP, config: ServerConfig) -> None:
@@ -56,7 +67,12 @@ def register_click_text_tools(mcp: FastMCP, config: ServerConfig) -> None:
             case_sensitive: if False (default), matching ignores case.
             button: one of left, right, middle, side, extra, forward, back, task.
             min_confidence: minimum OCR confidence (0-100) required to act
-                automatically. Raise this to be more conservative.
+                automatically. Only applies to the single-remaining-candidate
+                case -- multiple matches are always refused as ambiguous
+                regardless of confidence. Raise this to be more conservative;
+                lower it if a real, correct match is being refused for
+                scoring low (OCR confidence is a noisy signal, not a
+                reliable correctness proxy in either direction).
             expected_window_class: optional, same semantics as mouse_click's
                 parameter -- verified immediately before clicking (KDE
                 backend only).
