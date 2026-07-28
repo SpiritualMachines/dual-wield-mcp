@@ -1,12 +1,12 @@
 [project]
 name = "dual-wield-mcp"
-version = "1.12.0"
+version = "1.13.0"
 description = "MCP server exposing Linux desktop control (screenshot, input, window management) over Wayland"
 readme = "README.md"
 requires-python = ">=3.14"
 license = { text = "MIT" }
 dependencies = [
-    "mcp[cli]>=1.28.1",
+    "mcp[cli]>=1.28.1,<2.0.0",
     "pillow>=12.3.0",
     "pytesseract>=0.3.13",
 ]

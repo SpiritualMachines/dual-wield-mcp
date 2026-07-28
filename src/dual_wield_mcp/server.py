@@ -7,6 +7,7 @@ from dual_wield_mcp.config import ServerConfig
 from dual_wield_mcp.tools.app import register_app_tools
 from dual_wield_mcp.tools.click_text import register_click_text_tools
 from dual_wield_mcp.tools.clipboard import register_clipboard_tools
+from dual_wield_mcp.tools.initialize import register_initialize_tool
 from dual_wield_mcp.tools.input import register_input_tools
 from dual_wield_mcp.tools.ocr import register_ocr_tools
 from dual_wield_mcp.tools.paste_text import register_paste_text_tools
@@ -33,6 +34,13 @@ def _ensure_session_environment() -> None:
 
 
 _INSTRUCTIONS = """\
+Call initialize() once, as the very first action in a new session, before any
+task-driven tool use. It pre-warms mouse_move's pointer calibration (the
+first real click of a fresh session can otherwise land off-target while that
+calibration is still converging) and returns a snapshot of session-start
+desktop state -- display scale, detected window backend, and a fresh window
+listing -- so that doesn't need rediscovering reactively call by call.
+
 Two different pixel spaces are in play; mixing them up produces off-target
 clicks. `get_windows` reports window position/size in KWin's logical
 (HiDPI-scale-adjusted) pixels. `screenshot`, `mouse_move`, and `mouse_click` all
@@ -128,6 +136,7 @@ problem entirely, with no server-side change needed.
 
 def build_server(config: ServerConfig) -> FastMCP:
     mcp = FastMCP("dual-wield-mcp", instructions=_INSTRUCTIONS)
+    register_initialize_tool(mcp, config)
     register_screenshot_tool(mcp, config)
     register_input_tools(mcp, config)
     register_window_tools(mcp, config)

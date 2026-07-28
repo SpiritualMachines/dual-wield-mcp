@@ -70,6 +70,13 @@ _MOUSE_LOCATION_RE = re.compile(r"x:(-?\d+)\s+y:(-?\d+)")
 # different binary isn't served a stale value from another config.
 _display_scale_cache: dict[str, float] = {}
 
+# Physical panel resolution (pixels) of the enabled display -- same
+# subprocess and JSON payload _get_display_scale reads, but a different
+# field, and cached separately since the two are read independently by
+# different callers with no shared plumbing between them worth adding for
+# two lookups.
+_display_size_cache: dict[str, tuple[float, float]] = {}
+
 # The calibrated move ratio learned by closed-loop correction reflects the host's
 # pointer-acceleration curve, not anything specific to one mouse_move call, so it's
 # kept across calls (keyed by ydotool path) instead of resetting to the empirical
@@ -121,6 +128,30 @@ def _get_display_scale(config: ServerConfig) -> float:
                 return scale
     except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
         raise ToolError(f"could not determine display scale: {exc}") from exc
+    raise ToolError("kscreen-doctor reported no enabled outputs")
+
+
+def _get_display_size(config: ServerConfig) -> tuple[float, float]:
+    # output["size"] is the panel's native resolution in physical pixels --
+    # the same space screenshot/mouse_move/mouse_click use -- as opposed to
+    # kscreen-doctor's separate "screen.currentSize", which is the
+    # HiDPI-scaled logical desktop size get_windows/move_window/
+    # resize_window use.
+    cached = _display_size_cache.get(config.kscreen_doctor_path)
+    if cached is not None:
+        return cached
+
+    raw = _run([config.kscreen_doctor_path, "-j", "-o"])
+    try:
+        data, _ = json.JSONDecoder().raw_decode(raw)
+        for output in data["outputs"]:
+            if output.get("enabled"):
+                size = output["size"]
+                width, height = float(size["width"]), float(size["height"])
+                _display_size_cache[config.kscreen_doctor_path] = (width, height)
+                return (width, height)
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+        raise ToolError(f"could not determine display size: {exc}") from exc
     raise ToolError("kscreen-doctor reported no enabled outputs")
 
 

@@ -4,7 +4,7 @@ MCP (Model Context Protocol) server exposing Linux desktop control to AI agents 
 
 ## Status
 
-v1.12.0 — Phases 1-12 and 15-17 complete. Phase 13 (session initialization and permission warm-up) and Phase 14 (Concurrent Input Detection) are both exploratory, no version target. See [ROADMAP.md](ROADMAP.md).
+v1.13.0 — Phases 1-12 and 15-17 complete; Phase 13 (session initialization and permission warm-up) mostly complete. Phase 14 (Concurrent Input Detection) is exploratory, no version target. See [ROADMAP.md](ROADMAP.md).
 
 **Tip:** call `focus_window` before `type_text`/`key_press` to target a specific window —
 synthetic mouse clicks alone do not reliably transfer keyboard focus on KWin (see
@@ -175,6 +175,7 @@ Environment variables (all optional):
 
 ## Tools
 
+- `initialize()` — call this once, as the first action in a new session, before any task-driven tool use. Pre-warms `mouse_move`'s pointer calibration (the first real click of a fresh session can otherwise land off-target while that calibration is still converging) and returns a snapshot of session-start desktop state — display scale, detected window backend, and (KDE backend only) a fresh window listing — instead of rediscovering it reactively call by call.
 - `screenshot(mode="full"|"region", output_path=None, include_image=True)` — captures the desktop via `spectacle` in background mode, optionally selecting a region first via an on-screen drag selection. Returns the saved file's absolute path as text, followed by the captured image. Pass `include_image=False` to return only the path when the screenshot is just input to `find_text`/`click_text` and won't be viewed directly — skips sending the image for vision processing.
 - `inspect_region(path, x, y, width, height, output_path=None)` — crops a rectangular region out of an existing screenshot for close-up pixel inspection, without shelling out to `magick`/`identify`. Returns the cropped file's absolute path as text, followed by the cropped image.
 - `mouse_move(x, y, space="physical")` — move the pointer to an absolute screen position. `space="logical"` accepts `get_windows`/`move_window`-style coordinates directly, converting via the display scale instead of requiring the caller to do it by hand.

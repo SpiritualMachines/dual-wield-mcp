@@ -1,5 +1,48 @@
 # Changelog
 
+## [1.13.0] - 2026-07-28
+
+Phase 13 (Session Initialization & Permission Warm-Up) mostly complete --
+the original permission-prompt problem this phase was named for turned out
+to have a simpler client-config fix (see [1.1.1]/README's allowlist
+guidance), but a real, live-observed gap remained: the very first click of
+a fresh session missed its target twice in separate test runs.
+
+### Added
+
+- New `initialize()` tool. Call it once, as the first action in a new
+  session, before any task-driven tool use (the server's `instructions` now
+  say so explicitly). Pre-warms `mouse_move`'s closed-loop pointer
+  calibration with two real moves (display center, then an off-center
+  point) so it isn't still converging on the first real, task-driven click
+  -- the observed cause of the first-click-miss. Also returns a
+  consolidated snapshot of session-start desktop state (display scale,
+  detected window backend, and a fresh window listing on the KDE backend)
+  instead of the agent rediscovering it reactively call by call. New
+  `_get_display_size` helper in `input.py`, reading the same
+  `kscreen-doctor -j -o` payload `_get_display_scale` already does.
+
+### Fixed
+
+- Pinned `mcp[cli]` to `>=1.28.1,<2.0.0`. The upstream `mcp` SDK published a
+  breaking v2.0.0 release that removes `mcp.server.fastmcp` entirely; the
+  previously unbounded `>=1.28.1` constraint let a routine reinstall pull
+  it in and silently break the installed server (`ModuleNotFoundError:
+  No module named 'mcp.server.fastmcp'`), surfacing as a live MCP
+  reconnect failure. `pyproject.toml` and `requirements.txt` now both cap
+  it below 2.0.0, the actual tested range.
+
+### Known limitations
+
+- The pre-warm's effectiveness was not independently re-verified live
+  (re-running against a fresh server process to compare first-click
+  accuracy with and without it) -- covered by unit tests asserting the
+  exact calibration targets computed instead. See ROADMAP.md Phase 13 for
+  the reasoning.
+- One originally-scoped item remains: once Phase 14 (Concurrent Input
+  Detection) exists, have `initialize()` ask the user whether to arm it for
+  the session. Not yet started.
+
 ## [1.12.0] - 2026-07-28
 
 Phase 17 (Live-Feedback Follow-ups) complete -- the fourth and final item
