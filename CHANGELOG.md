@@ -1,5 +1,38 @@
 # Changelog
 
+## [1.9.0] - 2026-07-28
+
+Phase 16 (Long-Text Input Timeout & Partial-Type Corruption) complete --
+fixes two distinct bugs surfaced by a live Hermes Agent + local-model
+end-to-end test, both sharing the same flat `_SUBPROCESS_TIMEOUT = 10`
+symptom but with different root causes.
+
+### Fixed
+
+- `type_text` now scales its timeout with the string's length instead of a
+  flat 10s ceiling. `ydotool type` simulates real per-character keystrokes,
+  so a long paragraph legitimately took longer than 10s to type, and
+  Python's `subprocess.run(..., timeout=...)` SIGKILLs the child on
+  timeout -- killing `ydotool type` mid-keystream and leaving corrupted,
+  partially-typed text in the target window, confirmed live via a garbled
+  file diff. The timeout is now `max(10s, 3s + 45ms * len(text))`. If a
+  timeout still occurs, the error now explicitly warns that partial text
+  may already be in the focused window, instead of a generic timeout
+  message.
+- `clipboard_set` no longer hangs for the full timeout on every call.
+  Root-caused precisely: `wl-copy` forks and keeps running in the
+  background to serve future paste requests (documented in
+  `wl-clipboard(1)`), and the backgrounded process inherits and holds open
+  the stdout/stderr pipe file descriptors `subprocess.run()` created to
+  capture output. `communicate()` waits for EOF on both pipes, which never
+  arrives while the background copy is alive -- so every successful
+  `clipboard_set` call was blocking for the full 10s even though the
+  clipboard had already been set correctly within milliseconds. Confirmed
+  empirically (a successful call left `wl-copy` running indefinitely,
+  independent of input length). Fixed by switching to `Popen` +
+  `wait()` (which only waits for the immediate process's exit, not pipe
+  EOF) instead of `run()`/`communicate()`.
+
 ## [1.8.0] - 2026-07-27
 
 Phase 15 (Move-and-Click Round-Trip Reduction) complete -- closes the one

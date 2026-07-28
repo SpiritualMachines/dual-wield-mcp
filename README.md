@@ -4,7 +4,7 @@ MCP (Model Context Protocol) server exposing Linux desktop control to AI agents 
 
 ## Status
 
-v1.8.0 — Phases 1-12 and 15 complete. Phase 13 (session initialization and permission warm-up) and Phase 14 (Concurrent Input Detection) are both exploratory, no version target. See [ROADMAP.md](ROADMAP.md).
+v1.9.0 — Phases 1-12, 15, and 16 complete. Phase 13 (session initialization and permission warm-up) and Phase 14 (Concurrent Input Detection) are both exploratory, no version target. See [ROADMAP.md](ROADMAP.md).
 
 **Tip:** call `focus_window` before `type_text`/`key_press` to target a specific window —
 synthetic mouse clicks alone do not reliably transfer keyboard focus on KWin (see
@@ -110,8 +110,12 @@ Manual alternative — add this to `.mcp.json` (project scope) yourself:
 ### Hermes Agent registration
 
 ```bash
-hermes mcp add dual-wield-mcp
+hermes mcp add dual-wield --command dual-wield-mcp
 ```
+
+`dual-wield` is just the label Hermes stores the server under; `--command` is the actual
+binary to launch (verified against a real Hermes Agent v0.13.0 install — `hermes mcp add`
+requires an explicit `--command` or `--url`, a bare server name alone is not enough).
 
 ### Recommended agent configuration
 
@@ -176,7 +180,7 @@ Environment variables (all optional):
 - `mouse_move(x, y, space="physical")` — move the pointer to an absolute screen position. `space="logical"` accepts `get_windows`/`move_window`-style coordinates directly, converting via the display scale instead of requiring the caller to do it by hand.
 - `mouse_click(button="left", x=None, y=None, space="physical", expected_window_class=None, double=False)` — click a mouse button (`left`, `right`, `middle`, `side`, `extra`, `forward`, `back`, `task`). Pass `x`/`y` (and optionally `space`, same meaning as `mouse_move`'s) to move the pointer there first and click in one call — required together, and removes the MCP round trip a separate `mouse_move` + `mouse_click` pair leaves open for the user's own live mouse movement to land in; omit both to click wherever the pointer already is. If `expected_window_class` is given, verifies the focused window's class (after any move, immediately before clicking) and raises `ToolError` on a mismatch instead of clicking a possibly stale target (KDE backend only). Pass `double=True` to double-click (two clicks within this one call, separated by a short server-side delay) — two separate `mouse_click` calls do not reliably register as a double-click, since the round trip between them is slower than the desktop's double-click timing threshold.
 - `key_press(keys)` — press a key or `+`-joined combination (e.g. `"ctrl+shift+t"`).
-- `type_text(text, expected_window_class=None)` — type a literal string. If `expected_window_class` is given, verifies the focused window's class both before and after typing, raising `ToolError` on a mismatch — the post-check catches focus drift (e.g. the user alt-tabbing) mid-action (KDE backend only).
+- `type_text(text, expected_window_class=None)` — type a literal string. If `expected_window_class` is given, verifies the focused window's class both before and after typing, raising `ToolError` on a mismatch — the post-check catches focus drift (e.g. the user alt-tabbing) mid-action (KDE backend only). The internal timeout scales with the string's length instead of a flat ceiling, since simulated per-character typing takes real, length-proportional time; if it still times out, the error explicitly warns that partial text may already be in the focused window rather than failing silently. Prefer `clipboard_set` + `key_press("ctrl+v")` over this for long or special-character strings.
 - `get_windows()` — list visible windows with id, title, class, pid, and position/size. KDE backend only (`wlrctl` has no window-listing command). Note: position/size are in KWin's logical (HiDPI-scaled) pixels, which can differ from the physical pixels used by `screenshot`/mouse tools.
 - `get_active_window()` — metadata for the currently focused window, same fields as `get_windows`. KDE backend only. Use before `type_text`/`key_press` to confirm the window you think is focused actually is, instead of trusting a stale `get_windows`/`focus_window` result.
 - `focus_window(window)` — activate (focus and raise) a window by id (KDE) or title substring (either backend). Use this before `type_text`/`key_press` to reliably target a specific window — see the Tip above.

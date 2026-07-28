@@ -15,6 +15,16 @@ logger = logging.getLogger(__name__)
 
 _SUBPROCESS_TIMEOUT = 10
 
+# ydotool type simulates real per-character keystrokes, so its wall-clock time
+# scales with string length -- a flat timeout is the wrong shape of limit for it.
+# ydotool's own documented defaults are 20ms key-delay (between keys) + 20ms
+# key-hold (down-to-up per key) = ~40ms/char; this constant is set a little above
+# that as a safety margin for slower systems, not a measured maximum.
+_TYPE_MS_PER_CHAR = 45
+# Fixed slack added on top of the per-character estimate, covering process
+# spawn/dispatch overhead that doesn't scale with text length.
+_TYPE_TIMEOUT_MARGIN_SECONDS = 3
+
 # ydotool click button codes: low nibble selects the button, high nibble selects
 # down/up/both (see `ydotool click --help`)
 _BUTTON_CODES = {
@@ -69,17 +79,18 @@ _display_scale_cache: dict[str, float] = {}
 _move_ratio_cache: dict[str, tuple[float, float]] = {}
 
 
-def _run(cmd: list[str]) -> str:
+def _run(
+    cmd: list[str], timeout: float = _SUBPROCESS_TIMEOUT, timeout_hint: str | None = None
+) -> str:
     # list-form argv (no shell=True) so key/text content can never be interpreted
     # as shell syntax
     try:
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=_SUBPROCESS_TIMEOUT, check=False
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
     except FileNotFoundError as exc:
         raise ToolError(f"{cmd[0]} not found: {exc}") from exc
     except subprocess.TimeoutExpired as exc:
-        raise ToolError(f"{cmd[0]} timed out after {_SUBPROCESS_TIMEOUT}s") from exc
+        hint = f" -- {timeout_hint}" if timeout_hint else ""
+        raise ToolError(f"{cmd[0]} timed out after {timeout}s{hint}") from exc
 
     if result.returncode != 0:
         raise ToolError(f"{cmd[0]} failed: {result.stderr.strip()}")
@@ -332,8 +343,16 @@ def register_input_tools(mcp: FastMCP, config: ServerConfig) -> None:
     def type_text(text: str, expected_window_class: str | None = None) -> str:
         """Type a literal text string via the keyboard.
 
+        Simulated per-character typing is slow for long strings -- prefer
+        clipboard_set followed by key_press("ctrl+v") for anything more than a
+        short phrase; it is a single atomic operation instead of one keystroke
+        per character.
+
         Args:
-            text: the string to type
+            text: the string to type. The wait for ydotool to finish scales
+                with this string's length (real per-character keystroke
+                simulation, not a fixed cost), so longer strings are allowed
+                proportionally more time before this call times out.
             expected_window_class: optional. If given, verify the currently
                 focused window's class matches both before and after typing,
                 raising ToolError on a mismatch instead of trusting the text
@@ -348,9 +367,21 @@ def register_input_tools(mcp: FastMCP, config: ServerConfig) -> None:
 
         _check_expected_window(config, expected_window_class)
 
+        timeout = max(
+            _SUBPROCESS_TIMEOUT,
+            _TYPE_TIMEOUT_MARGIN_SECONDS + len(text) * _TYPE_MS_PER_CHAR / 1000,
+        )
         cmd = [config.ydotool_path, "type", "--", text]
-        logger.info("typing text (%d chars)", len(text))
-        _run(cmd)
+        logger.info("typing text (%d chars), timeout=%.1fs", len(text), timeout)
+        _run(
+            cmd,
+            timeout=timeout,
+            timeout_hint=(
+                "ydotool was killed mid-keystream, so partial text may already be in "
+                "the focused window -- check the target and undo/fix before retrying "
+                "rather than re-typing on top of it"
+            ),
+        )
 
         _check_expected_window(config, expected_window_class)
         return f"typed {len(text)} characters"
