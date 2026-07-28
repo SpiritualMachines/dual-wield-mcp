@@ -4,7 +4,7 @@ MCP (Model Context Protocol) server exposing Linux desktop control to AI agents 
 
 ## Status
 
-v1.10.0 — Phases 1-12, 15, and 16 complete; Phase 17 (Live-Feedback Follow-ups) partially complete. Phase 13 (session initialization and permission warm-up) and Phase 14 (Concurrent Input Detection) are both exploratory, no version target. See [ROADMAP.md](ROADMAP.md).
+v1.11.0 — Phases 1-12, 15, and 16 complete; Phase 17 (Live-Feedback Follow-ups) partially complete. Phase 13 (session initialization and permission warm-up) and Phase 14 (Concurrent Input Detection) are both exploratory, no version target. See [ROADMAP.md](ROADMAP.md).
 
 **Tip:** call `focus_window` before `type_text`/`key_press` to target a specific window —
 synthetic mouse clicks alone do not reliably transfer keyboard focus on KWin (see

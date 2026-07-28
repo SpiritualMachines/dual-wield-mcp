@@ -24,6 +24,19 @@ logger = logging.getLogger(__name__)
 # ClamTk"), making the returned center coordinate useless for any one label.
 _LINE_SPLIT_GAP_RATIO = 2.5
 
+# Small buffer added to each side of a window's reported bounds before
+# cropping for window-scoped OCR, in physical pixels. Guards against text
+# sitting right at the true edge being clipped mid-glyph -- seen live on a
+# clamtk window where edge text was missed entirely. Likely cause: the
+# logical-to-physical conversion (float, truncated to int) or window
+# geometry not landing pixel-exact on the actually-painted content area.
+# Kept small and fixed rather than proportional to window size: large enough
+# to absorb a few pixels of rounding slop, small enough that it can't
+# plausibly reach far enough to pull in a neighboring window or the desktop
+# and reintroduce the cross-window text merging this scoping exists to
+# prevent in the first place (see _ocr_lines_in_window's own docstring).
+_WINDOW_CROP_PADDING = 8
+
 
 def _group_words_into_lines(data: dict) -> list[dict]:
     # pytesseract's image_to_data returns one row per detected word; a multi-word
@@ -148,8 +161,10 @@ def _ocr_lines_in_window(path: str, config: ServerConfig, window: str) -> list[d
 
     image = _load_image(path)
     img_width, img_height = image.size
-    left, top = max(0, int(x0)), max(0, int(y0))
-    right, bottom = min(img_width, int(x1)), min(img_height, int(y1))
+    left = max(0, int(x0) - _WINDOW_CROP_PADDING)
+    top = max(0, int(y0) - _WINDOW_CROP_PADDING)
+    right = min(img_width, int(x1) + _WINDOW_CROP_PADDING)
+    bottom = min(img_height, int(y1) + _WINDOW_CROP_PADDING)
     if right <= left or bottom <= top:
         raise ToolError(
             f"window {window!r}'s bounds ({left},{top})-({right},{bottom}) do not "

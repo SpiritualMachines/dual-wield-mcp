@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.11.0] - 2026-07-28
+
+Phase 17 (Live-Feedback Follow-ups) advanced with a third item -- the
+window-scoped OCR crop-edge miss reported in the same Hermes Agent feedback
+review as the previous release. One item (a move/resize settle delay)
+remains proposed.
+
+### Fixed
+
+- Window-scoped OCR (`find_text`/`read_screen_text`/`click_text`'s `window`
+  parameter) occasionally missed text sitting right at the crop edge,
+  observed live on a `clamtk` window. The crop now pads the window's
+  reported bounds by 8 physical pixels on each side before clamping to the
+  screenshot's own edges (`_WINDOW_CROP_PADDING` in `ocr.py`), absorbing
+  rounding slop between the window's reported geometry and its actually
+  painted content without growing large enough to plausibly pull in a
+  neighboring window and reintroduce the cross-window text merging window
+  scoping exists to prevent (see the [1.7.0] entry below).
+
 ## [1.10.0] - 2026-07-28
 
 Phase 17 (Live-Feedback Follow-ups) partially complete -- the two
