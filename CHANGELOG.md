@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.13.3] - 2026-07-29
+
+### Changed
+
+- `click_text` no longer refuses a single, unambiguous match for scoring
+  below a confidence threshold. The `min_confidence` parameter and
+  `_DEFAULT_MIN_CONFIDENCE` constant are removed entirely, discussed and
+  decided directly with the user rather than retuning the default a third
+  time (it had already moved 60 -> 40 in [1.10.0] and was still refusing
+  real matches at 37.3%). The ambiguity check (multiple matches always
+  refuse) was already the real safety net; confidence has been shown live
+  not to reliably track correctness in either direction (a real match as
+  low as 37.3%; a genuine misread at 87%, see [1.10.0]/[1.4.0]). A single
+  match now always acts and still reports its confidence score in the
+  result text. Completes Phase 18; see ROADMAP.md.
+
 ## [1.13.2] - 2026-07-29
 
 ### Added

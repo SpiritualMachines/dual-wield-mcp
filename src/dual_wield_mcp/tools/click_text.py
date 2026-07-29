@@ -16,19 +16,6 @@ from dual_wield_mcp.tools.screenshot import _capture_screenshot
 
 logger = logging.getLogger(__name__)
 
-# Only ever gates the single-remaining-candidate case in practice: multiple
-# substring matches are always refused as ambiguous above, regardless of
-# confidence, so this threshold never actually chooses among several
-# candidates -- it is purely "how sure does OCR need to be about the one
-# read that's left" before acting automatically. A live test found a real,
-# correct, unambiguous match ("Select a directory") scored only 48
-# confidence and was wrongly refused at the old default of 60. Note
-# confidence is not a reliable proxy for correctness in either direction --
-# benchmarks/find_text/README.md documents a genuine misread ("Details" ->
-# "Detalls") scoring 87 -- so this default is a pragmatic adjustment based
-# on the one real false-refusal observed, not a validated accuracy cutoff.
-_DEFAULT_MIN_CONFIDENCE = 40.0
-
 
 def register_click_text_tools(mcp: FastMCP, config: ServerConfig) -> None:
     @mcp.tool()
@@ -37,7 +24,6 @@ def register_click_text_tools(mcp: FastMCP, config: ServerConfig) -> None:
         path: str | None = None,
         case_sensitive: bool = False,
         button: str = "left",
-        min_confidence: float = _DEFAULT_MIN_CONFIDENCE,
         expected_window_class: str | None = None,
         window: str | None = None,
     ) -> str:
@@ -46,18 +32,23 @@ def register_click_text_tools(mcp: FastMCP, config: ServerConfig) -> None:
         Combines screenshot + find_text + mouse_move + mouse_click into a
         single tool call: takes a fresh full-desktop screenshot if path is not
         given, locates query with the same OCR/grouping logic as find_text,
-        and -- only when there is exactly one match meeting min_confidence --
-        moves the pointer to its center and clicks. No image is sent to the
-        calling agent for this path, and there is no gap between locating the
-        target and acting on it for the desktop to change in, unlike a manual
-        screenshot -> find_text -> mouse_move -> mouse_click sequence.
+        and -- only when there is exactly one match -- moves the pointer to
+        its center and clicks. No image is sent to the calling agent for this
+        path, and there is no gap between locating the target and acting on
+        it for the desktop to change in, unlike a manual screenshot ->
+        find_text -> mouse_move -> mouse_click sequence.
 
-        Ambiguous cases are refused rather than guessed at: zero matches,
-        more than one match, or a best match below min_confidence all raise
-        ToolError describing what was found, instead of picking one. Fall
-        back to find_text plus a screenshot/inspect_region visual check to
-        disambiguate in that case -- the same judgment call a manual click
-        would need.
+        Ambiguity is refused rather than guessed at: zero matches or more
+        than one match both raise ToolError describing what was found,
+        instead of picking one. Fall back to find_text plus a screenshot/
+        inspect_region visual check to disambiguate in that case -- the same
+        judgment call a manual click would need. A single match acts
+        regardless of its OCR confidence score, which the returned message
+        still reports -- confidence has been shown, live, to be an unreliable
+        proxy for correctness in both directions (a real match scoring as low
+        as 37 percent; a genuine misread scoring 87 percent), so it is
+        informational here rather than a second gate on top of the ambiguity
+        check.
 
         Args:
             query: substring to search for, same semantics as find_text.
@@ -66,13 +57,6 @@ def register_click_text_tools(mcp: FastMCP, config: ServerConfig) -> None:
                 screenshot if omitted.
             case_sensitive: if False (default), matching ignores case.
             button: one of left, right, middle, side, extra, forward, back, task.
-            min_confidence: minimum OCR confidence (0-100) required to act
-                automatically. Only applies to the single-remaining-candidate
-                case -- multiple matches are always refused as ambiguous
-                regardless of confidence. Raise this to be more conservative;
-                lower it if a real, correct match is being refused for
-                scoring low (OCR confidence is a noisy signal, not a
-                reliable correctness proxy in either direction).
             expected_window_class: optional, same semantics as mouse_click's
                 parameter -- verified immediately before clicking (KDE
                 backend only).
@@ -88,8 +72,6 @@ def register_click_text_tools(mcp: FastMCP, config: ServerConfig) -> None:
         button_code = _BUTTON_CODES.get(button.strip().lower())
         if button_code is None:
             raise ToolError(f"unknown button: {button!r}")
-        if not 0 <= min_confidence <= 100:
-            raise ToolError("min_confidence must be between 0 and 100")
 
         image_path = path if path is not None else str(_capture_screenshot(config, "full", None))
 
@@ -109,14 +91,6 @@ def register_click_text_tools(mcp: FastMCP, config: ServerConfig) -> None:
             )
 
         match = matches[0]
-        if match["confidence"] < min_confidence:
-            raise ToolError(
-                f"only match for {query!r} ({match['text']!r}) has confidence "
-                f"{match['confidence']:.1f}, below min_confidence={min_confidence} -- "
-                "refusing to click on a low-confidence OCR read. Use find_text plus a "
-                "visual check to confirm."
-            )
-
         _check_expected_window(config, expected_window_class)
 
         logger.info(
