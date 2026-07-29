@@ -9,21 +9,25 @@ from mcp.server.fastmcp.exceptions import ToolError
 
 from dual_wield_mcp.config import ServerConfig
 from dual_wield_mcp.keycodes import KEY_CODES
+from dual_wield_mcp.tools.clipboard import _run_wl_copy
 from dual_wield_mcp.tools.window import _detect_backend, _kde_active_window_class
 
 logger = logging.getLogger(__name__)
 
 _SUBPROCESS_TIMEOUT = 10
 
-# ydotool type simulates real per-character keystrokes, so its wall-clock time
-# scales with string length -- a flat timeout is the wrong shape of limit for it.
-# ydotool's own documented defaults are 20ms key-delay (between keys) + 20ms
-# key-hold (down-to-up per key) = ~40ms/char; this constant is set a little above
-# that as a safety margin for slower systems, not a measured maximum.
-_TYPE_MS_PER_CHAR = 45
-# Fixed slack added on top of the per-character estimate, covering process
-# spawn/dispatch overhead that doesn't scale with text length.
-_TYPE_TIMEOUT_MARGIN_SECONDS = 3
+# Above this length, type_text pastes via the clipboard instead of simulating
+# keystrokes with ydotool type: strictly faster (one atomic paste vs. one
+# ydotool call per character) and immune to the partial-type corruption a
+# killed-on-timeout ydotool type can leave behind (see the timeout_hint
+# below). Below it, per-character typing has no real downside and is left as
+# the default so a short call never has an unannounced side effect on the
+# clipboard. 100 chars is comfortably past "a short phrase" (the existing
+# guidance's own dividing line) and, at ydotool's own documented ~40ms/char
+# default (20ms key-delay + 20ms key-hold), comfortably within the flat
+# _SUBPROCESS_TIMEOUT floor even in the worst case -- so text that still goes
+# through the typing path never needs a longer, length-scaled timeout.
+_TYPE_TEXT_PASTE_THRESHOLD = 100
 
 # ydotool click button codes: low nibble selects the button, high nibble selects
 # down/up/both (see `ydotool click --help`)
@@ -234,6 +238,17 @@ def _check_expected_window(config: ServerConfig, expected_window_class: str | No
         )
 
 
+def _paste_via_clipboard(config: ServerConfig, text: str) -> None:
+    # shared by type_text's long-text fallback and the standalone paste_text
+    # tool (tools/paste_text.py), so the two never drift out of sync
+    _run_wl_copy([config.wl_copy_path], text)
+
+    codes = [_resolve_key(name) for name in ("ctrl", "v")]
+    down = [f"{code}:1" for code in codes]
+    up = [f"{code}:0" for code in reversed(codes)]
+    _run([config.ydotool_path, "key", *down, *up])
+
+
 def register_input_tools(mcp: FastMCP, config: ServerConfig) -> None:
     @mcp.tool()
     def mouse_move(x: int, y: int, space: str = "physical") -> str:
@@ -374,39 +389,50 @@ def register_input_tools(mcp: FastMCP, config: ServerConfig) -> None:
     def type_text(text: str, expected_window_class: str | None = None) -> str:
         """Type a literal text string via the keyboard.
 
-        Simulated per-character typing is slow for long strings -- prefer
-        clipboard_set followed by key_press("ctrl+v") for anything more than a
-        short phrase; it is a single atomic operation instead of one keystroke
-        per character.
+        Text longer than 100 characters is pasted via the clipboard instead
+        of typed -- a single atomic paste rather than one simulated keystroke
+        per character, and immune to the partial-text corruption a
+        killed-on-timeout ydotool type can otherwise leave behind. This
+        overwrites the current clipboard contents; use clipboard_get first if
+        you need to restore it afterward. Text at or under 100 characters is
+        still typed via ydotool, with no clipboard side effect.
 
         Args:
-            text: the string to type. The wait for ydotool to finish scales
-                with this string's length (real per-character keystroke
-                simulation, not a fixed cost), so longer strings are allowed
-                proportionally more time before this call times out.
+            text: the string to type or paste. Above the 100-character
+                threshold, pasting is effectively instant regardless of
+                length. At or under the threshold, real per-character
+                keystroke simulation stays comfortably within the default
+                timeout at any length this short.
             expected_window_class: optional. If given, verify the currently
-                focused window's class matches both before and after typing,
-                raising ToolError on a mismatch instead of trusting the text
-                landed in the intended window. Get a window's class from
-                get_windows or get_active_window. KDE backend only. Checked on
-                both sides (unlike mouse_click) because typing normally should
-                not itself change focus, so a post-check can catch the user
-                switching windows (e.g. alt-tabbing) partway through.
+                focused window's class matches both before and after typing
+                or pasting, raising ToolError on a mismatch instead of
+                trusting the text landed in the intended window. Get a
+                window's class from get_windows or get_active_window. KDE
+                backend only. Checked on both sides (unlike mouse_click)
+                because typing/pasting normally should not itself change
+                focus, so a post-check can catch the user switching windows
+                (e.g. alt-tabbing) partway through.
         """
         if not text:
             raise ToolError("text must not be empty")
 
         _check_expected_window(config, expected_window_class)
 
-        timeout = max(
-            _SUBPROCESS_TIMEOUT,
-            _TYPE_TIMEOUT_MARGIN_SECONDS + len(text) * _TYPE_MS_PER_CHAR / 1000,
-        )
+        if len(text) > _TYPE_TEXT_PASTE_THRESHOLD:
+            logger.info(
+                "text length %d exceeds paste threshold (%d), pasting via clipboard "
+                "instead of typing",
+                len(text),
+                _TYPE_TEXT_PASTE_THRESHOLD,
+            )
+            _paste_via_clipboard(config, text)
+            _check_expected_window(config, expected_window_class)
+            return f"pasted {len(text)} characters via clipboard"
+
         cmd = [config.ydotool_path, "type", "--", text]
-        logger.info("typing text (%d chars), timeout=%.1fs", len(text), timeout)
+        logger.info("typing text (%d chars)", len(text))
         _run(
             cmd,
-            timeout=timeout,
             timeout_hint=(
                 "ydotool was killed mid-keystream, so partial text may already be in "
                 "the focused window -- check the target and undo/fix before retrying "

@@ -1,6 +1,6 @@
 [project]
 name = "dual-wield-mcp"
-version = "1.13.1"
+version = "1.13.2"
 description = "MCP server exposing Linux desktop control (screenshot, input, window management) over Wayland"
 readme = "README.md"
 requires-python = ">=3.14"

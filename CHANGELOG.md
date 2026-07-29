@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.13.2] - 2026-07-29
+
+### Added
+
+- `type_text` now auto-falls-back to pasting via the clipboard for text over
+  100 characters, instead of simulating keystrokes -- a single atomic paste
+  rather than one `ydotool` call per character, and immune to the
+  partial-type corruption a killed-on-timeout `ydotool type` can leave
+  behind. Overwrites the clipboard as a side effect for long text,
+  documented in `type_text`'s docstring. New shared `_paste_via_clipboard`
+  helper in `input.py` backs both this fallback and the standalone
+  `paste_text` tool, which now calls it instead of duplicating the
+  clipboard-set-then-paste steps. Completes Phase 16a's last open item; see
+  ROADMAP.md.
+
+### Removed
+
+- The length-aware timeout scaling added in [1.9.0] (`_TYPE_MS_PER_CHAR`,
+  `_TYPE_TIMEOUT_MARGIN_SECONDS`) is gone. With the new 100-character paste
+  threshold, `type_text`'s typing path never handles text long enough for
+  that scaling to matter (worst case ~4.5s at `ydotool`'s documented
+  ~40ms/char, well under the flat 10s timeout) -- it had become unreachable
+  dead code, so it was removed rather than left in place.
+
 ## [1.13.1] - 2026-07-29
 
 ### Fixed
