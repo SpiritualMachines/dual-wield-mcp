@@ -217,8 +217,11 @@ _WAIT_FOR_WINDOW_POLL_INTERVAL = 0.3
 
 
 def _window_matches(window: WindowInfo, title: str | None, window_class: str | None) -> bool:
+    # substring match, not exact -- KDE apps report a class like org.kde.kwrite,
+    # never the bare binary name, so an exact match on the natural post-launch_app
+    # guess ("kwrite") would always miss
     title_ok = title is None or title.lower() in window.title.lower()
-    class_ok = window_class is None or window.class_name == window_class
+    class_ok = window_class is None or window_class.lower() in window.class_name.lower()
     return title_ok and class_ok
 
 
@@ -350,8 +353,9 @@ def register_window_tools(mcp: FastMCP, config: ServerConfig) -> None:
 
         Args:
             title: optional title substring to match (case-insensitive).
-            window_class: optional exact class name to match (see get_windows).
-                At least one of title/window_class must be given.
+            window_class: optional class substring to match (case-insensitive,
+                see get_windows) -- e.g. "kwrite" matches a reported class of
+                org.kde.kwrite. At least one of title/window_class must be given.
             timeout: seconds to wait before raising ToolError.
 
         Only supported on the KDE backend (via kdotool) -- wlrctl has a

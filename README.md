@@ -4,7 +4,7 @@ MCP (Model Context Protocol) server exposing Linux desktop control to AI agents 
 
 ## Status
 
-v1.13.0 — Phases 1-12 and 15-17 complete; Phase 13 (session initialization and permission warm-up) mostly complete. Phase 14 (Concurrent Input Detection) is exploratory, no version target. See [ROADMAP.md](ROADMAP.md).
+v1.13.1 — Phases 1-12 and 15-17 complete; Phase 13 (session initialization and permission warm-up) mostly complete; Phase 18 (live LLM-driven navigation follow-ups) in progress. Phase 14 (Concurrent Input Detection) is exploratory, no version target. See [ROADMAP.md](ROADMAP.md).
 
 **Tip:** call `focus_window` before `type_text`/`key_press` to target a specific window —
 synthetic mouse clicks alone do not reliably transfer keyboard focus on KWin (see
@@ -185,7 +185,7 @@ Environment variables (all optional):
 - `get_windows()` — list visible windows with id, title, class, pid, and position/size. KDE backend only (`wlrctl` has no window-listing command). Note: position/size are in KWin's logical (HiDPI-scaled) pixels, which can differ from the physical pixels used by `screenshot`/mouse tools.
 - `get_active_window()` — metadata for the currently focused window, same fields as `get_windows`. KDE backend only. Use before `type_text`/`key_press` to confirm the window you think is focused actually is, instead of trusting a stale `get_windows`/`focus_window` result.
 - `focus_window(window)` — activate (focus and raise) a window by id (KDE) or title substring (either backend). Use this before `type_text`/`key_press` to reliably target a specific window — see the Tip above.
-- `wait_for_window(title=None, window_class=None, timeout=10.0)` — poll for a window matching a title substring and/or class, returning its metadata as soon as it appears instead of raising after a fixed sleep. Use this after `launch_app` instead of a manual `get_windows` polling loop. KDE backend only.
+- `wait_for_window(title=None, window_class=None, timeout=10.0)` — poll for a window matching a title substring and/or class substring, returning its metadata as soon as it appears instead of raising after a fixed sleep. Use this after `launch_app` instead of a manual `get_windows` polling loop. KDE backend only.
 - `close_window(window)` — close a window by id or title substring. KDE backend only (`wlrctl` has no close action). Prefer this over a Bash `kill <pid>`, which needs a fresh permission grant for every never-before-seen pid.
 - `move_window(window, x, y)` / `resize_window(window, width, height)` — move or resize a window by id or title substring, in KWin's logical pixels (same space as `get_windows`). KDE backend only. Goes through KWin's own scripting interface, so it works even where a launched application's own `--window-position`/`--window-size` flags are silently ignored by Wayland. Waits briefly before returning so a screenshot taken immediately after doesn't catch the window still animating into place.
 - `launch_app(command, args=None)` — launch a desktop application via a direct `subprocess.Popen` inside the server, detached and not waited on. Prefer this over a Bash command to launch anything: a never-before-launched binary always needs a fresh Bash permission grant even as a literal command, while this tool only needs allowlisting once regardless of what's launched afterward. Position the new window with `move_window`/`resize_window` once it appears, rather than a launch-time position flag.

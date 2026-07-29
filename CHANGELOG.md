@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.13.1] - 2026-07-29
+
+### Fixed
+
+- `wait_for_window`'s `window_class` match was exact (`==`), while its
+  `title` match was already substring. KDE apps almost always report a
+  class like `org.kde.kwrite`, never the bare binary name, so
+  `wait_for_window(window_class="kwrite")` -- the natural guess right after
+  `launch_app("kwrite")` -- was close to always wrong. `class_ok` is now a
+  case-insensitive substring/contains check, same shape as `title_ok`.
+  Surfaced live twice: Phase 12's finding #5 and again during a live
+  agent-driven navigation test (Phase 18). See ROADMAP.md Phase 18.
+
 ## [1.13.0] - 2026-07-28
 
 Phase 13 (Session Initialization & Permission Warm-Up) mostly complete --
